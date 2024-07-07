@@ -131,7 +131,7 @@ def normalize_dialogue(input_text):
     return os.linesep.join(normalized_lines)
 
 
-# 使用示例
+# 如果需要指定gamedata，请修改以下路径
 gamedata_directory = './gamedata'
 story_review_table_directory = os.path.join(gamedata_directory, 'excel', 'story_review_table.json')
 
