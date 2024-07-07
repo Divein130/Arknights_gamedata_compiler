@@ -50,6 +50,87 @@ def safe_concat_level_name(*args):
     return '_'.join([arg if arg is not None else '' for arg in args])
 
 
+def output_groupby_level(story_data):
+    output_directory = 'story_context'
+    output_directory = os.path.join(os.getcwd(), output_directory)
+    if os.path.exists(output_directory):
+        shutil.rmtree(output_directory)
+        print(f"目录已存在，已删除：{output_directory}")
+    os.makedirs(output_directory, exist_ok=True)
+    illegal_chars = r'[<>:"/\\|?*]'
+    for story_id in story_data.keys():
+        story = story_data[story_id]
+        story_name = story['name']
+        for level in story['level_list']:
+            if level.get('story_code') is None:
+                continue
+            level_name = safe_concat_level_name(story_name, level.get('story_name'), level.get('story_code'),
+                                                level.get('avg_tag'))
+            level_context = get_context_from_story_txt(level['story_txt_path'])
+            file_name = level_name + '.txt'
+            clean_file_name = re.sub(illegal_chars, '-', file_name)
+
+            file_path = os.path.join(output_directory, clean_file_name)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(normalize_dialogue(level_context))
+
+
+def output_groupby_story(story_data):
+    output_directory = 'story_context_story'
+    output_directory = os.path.join(os.getcwd(), output_directory)
+    if os.path.exists(output_directory):
+        shutil.rmtree(output_directory)
+        print(f"目录已存在，已删除：{output_directory}")
+    os.makedirs(output_directory, exist_ok=True)
+    illegal_chars = r'[<>:"/\\|?*]'
+    for story_id in story_data.keys():
+        story = story_data[story_id]
+        story_name = story['name']
+        story_context = []
+        for level in story['level_list']:
+            level_name = safe_concat_level_name('<', level.get('story_code'), level.get('story_name'),
+                                                level.get('avg_tag'), '>')
+
+            level_context = get_context_from_story_txt(level['story_txt_path'])
+            level_context = normalize_dialogue(level_context)
+            story_context.append(level_name)
+            story_context.append(level_context)
+        file_name = story_name + '.txt'
+        clean_file_name = re.sub(illegal_chars, '-', file_name)
+
+        file_path = os.path.join(output_directory, clean_file_name)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(os.linesep.join(story_context))
+
+def normalize_dialogue(input_text):
+    # 定义正则表达式模式来匹配对话内容
+    name_pattern = re.compile(r'\[name="([^"]+)"\]')
+    charslot_pattern = re.compile(r'\[charslot\(.*?\)\]')
+    dialogue_pattern = re.compile(r'\[name="([^"]+)"\](.*)')
+
+    # 存储归一化的对话
+    normalized_lines = []
+
+    # 按行处理输入文本
+    lines = input_text.splitlines()
+    for line in lines:
+        # 跳过charslot行
+        if charslot_pattern.match(line):
+            continue
+
+        # 处理对话行
+        match = dialogue_pattern.match(line)
+        if match:
+            name = match.group(1)
+            dialogue = match.group(2).strip()
+            normalized_lines.append(f'[{name}]: {dialogue}')
+        else:
+            # 处理非对话行（如stopmusic, delay等）
+            continue
+
+    return os.linesep.join(normalized_lines)
+
+
 # 使用示例
 gamedata_directory = './gamedata'
 story_review_table_directory = os.path.join(gamedata_directory, 'excel', 'story_review_table.json')
@@ -60,27 +141,7 @@ if json_data is None:
     exit(1)
 story_data = parse_story_json(json_data)
 
-output_directory = 'story_context'
-output_directory = os.path.join(os.getcwd(), output_directory);
-if os.path.exists(output_directory):
-    shutil.rmtree(output_directory)
-    print(f"目录已存在，已删除：{output_directory}")
-os.makedirs(output_directory, exist_ok=True)
-illegal_chars = r'[<>:"/\\|?*]'
-
-for story_id in story_data.keys():
-    story = story_data[story_id]
-    story_name = story['name']
-    for level in story['level_list']:
-        level_name = safe_concat_level_name(level.get('story_name'), level.get('story_code'), level.get('avg_tag'))
-        level_context = get_context_from_story_txt(level['story_txt_path'])
-        print(level_name)
-        # print(level_context)
-        file_name = level_name + '.txt'
-        clean_file_name = re.sub(illegal_chars, '-', file_name)
-
-        file_path = os.path.join(output_directory, clean_file_name)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(level_context)
+# output_groupby_level(story_data)
+output_groupby_story(story_data)
 
 # print(story_data)
