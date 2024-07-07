@@ -7,3 +7,6 @@
 # 如果需要指定gamedata，请修改以下路径
 gamedata_directory = './gamedata'
 ```
+### 如何获取gamedata
+
+参考该仓库[ArknightsGameData](https://github.com/Kengxxiao/ArknightsGameData)
