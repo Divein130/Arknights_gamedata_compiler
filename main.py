@@ -29,6 +29,7 @@ def parse_story_json(json_data):
             story_data[activity_code] = {}
             story_data[activity_code]['activity_code'] = activity_code
             story_data[activity_code]['name'] = name
+            story_data[activity_code]['type'] = activity_info['actType']
             story_data[activity_code]['level_list'] = []
         for level in activity_info['infoUnlockDatas']:
             story_txt_path = level.get('storyTxt')
@@ -59,7 +60,10 @@ def output_groupby_level(story_data):
     os.makedirs(output_directory, exist_ok=True)
     illegal_chars = r'[<>:"/\\|?*]'
     for story_id in story_data.keys():
+
         story = story_data[story_id]
+        if story['type'] == 'NONE':
+            continue
         story_name = story['name']
         for level in story['level_list']:
             if level.get('story_code') is None:
@@ -83,24 +87,49 @@ def output_groupby_story(story_data):
         print(f"目录已存在，已删除：{output_directory}")
     os.makedirs(output_directory, exist_ok=True)
     illegal_chars = r'[<>:"/\\|?*]'
+
+    MAX_CHARS_PER_FILE = 240000
+
     for story_id in story_data.keys():
         story = story_data[story_id]
+        if story['type'] == 'NONE':
+            continue
         story_name = story['name']
         story_context = []
+        current_char_count = 0
+        file_index = 1
         for level in story['level_list']:
-            level_name = safe_concat_level_name('<', level.get('story_code'), level.get('story_name'),
-                                                level.get('avg_tag'), '>')
+            level_name = '<' + safe_concat_level_name(story_name, level.get('story_name'),
+                                                      level.get('avg_tag')) + '>'
 
             level_context = get_context_from_story_txt(level['story_txt_path'])
             level_context = normalize_dialogue(level_context)
+
+            accumulated_context = os.linesep.join(story_context)
+            current_char_count += len(level_context.encode('utf-8'))
+            if current_char_count >= MAX_CHARS_PER_FILE:
+                file_name = f"{story_name}_{file_index}.txt"
+                clean_file_name = re.sub(illegal_chars, '-', file_name)
+                file_path = os.path.join(output_directory, clean_file_name)
+
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(accumulated_context)
+
+                # Reset for next file
+                story_context = []
+                current_char_count = 0
+                file_index += 1
             story_context.append(level_name)
             story_context.append(level_context)
-        file_name = story_name + '.txt'
-        clean_file_name = re.sub(illegal_chars, '-', file_name)
+        # Write remaining context if any
+        if story_context:
+            file_name = f"{story_name}_{file_index}.txt"
+            clean_file_name = re.sub(illegal_chars, '-', file_name)
+            file_path = os.path.join(output_directory, clean_file_name)
 
-        file_path = os.path.join(output_directory, clean_file_name)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(os.linesep.join(story_context))
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(os.linesep.join(story_context))
+
 
 def normalize_dialogue(input_text):
     # 定义正则表达式模式来匹配对话内容
@@ -123,7 +152,11 @@ def normalize_dialogue(input_text):
         if match:
             name = match.group(1)
             dialogue = match.group(2).strip()
-            normalized_lines.append(f'[{name}]: {dialogue}')
+            content = f'[{name}]: {dialogue}'
+            if dialogue == '......':
+                continue
+            content = content.replace('...','')
+            normalized_lines.append(content)
         else:
             # 处理非对话行（如stopmusic, delay等）
             continue
